@@ -73,6 +73,20 @@ fn test_simple_route_mock() {
 }
 
 #[test]
+fn test_query_arg_route_mock() {
+    reset();
+
+    let mocked_body = "world";
+    mock("GET", "/hello?query=123")
+        .with_body(mocked_body)
+        .create();
+
+    let (status_line, _, body) = request("GET /hello?query=123", "");
+    assert_eq!("HTTP/1.1 200\r\n", status_line);
+    assert_eq!(mocked_body, body);
+}
+
+#[test]
 fn test_two_route_mocks() {
     reset();
 
