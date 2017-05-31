@@ -27,7 +27,9 @@ fn parse_stream(stream: TcpStream) -> (String, Vec<String>, String) {
         let mut header_line = String::new();
         reader.read_line(&mut header_line).unwrap();
 
-        if header_line == "\r\n" { break }
+        if header_line == "\r\n" {
+            break;
+        }
 
         if header_line.starts_with("content-length:") {
             let mut parts = header_line.split(":");
@@ -38,7 +40,10 @@ fn parse_stream(stream: TcpStream) -> (String, Vec<String>, String) {
     }
 
     let mut body = String::new();
-    reader.take(content_length).read_to_string(&mut body).unwrap();
+    reader
+        .take(content_length)
+        .read_to_string(&mut body)
+        .unwrap();
 
     (status_line, headers, body)
 }
@@ -85,7 +90,9 @@ fn test_two_route_mocks() {
 fn test_no_match_returns_501() {
     reset();
 
-    mock("GET", Matcher::Exact("/".to_string())).with_body("matched").create();
+    mock("GET", Matcher::Exact("/".to_string()))
+        .with_body("matched")
+        .create();
 
     let (status_line, _, _) = request("GET /nope", "");
     assert_eq!("HTTP/1.1 501 Not Implemented\r\n", status_line);
@@ -116,7 +123,9 @@ fn test_match_header() {
 fn test_match_header_is_case_insensitive_on_the_field_name() {
     reset();
 
-    mock("GET", "/").match_header("content-type", "text/plain").create();
+    mock("GET", "/")
+        .match_header("content-type", "text/plain")
+        .create();
 
     let (uppercase_status_line, _, _) = request("GET /", "Content-Type: text/plain\r\n");
     assert_eq!("HTTP/1.1 200\r\n", uppercase_status_line);
@@ -135,10 +144,12 @@ fn test_match_multiple_headers() {
         .with_body("matched")
         .create();
 
-    let (_, _, body_matching) = request("GET /", "content-type: text/plain\r\nauthorization: secret\r\n");
+    let (_, _, body_matching) = request("GET /",
+                                        "content-type: text/plain\r\nauthorization: secret\r\n");
     assert_eq!("matched", body_matching);
 
-    let (status_not_matching, _, _) = request("GET /", "content-type: text/plain\r\nauthorization: meh\r\n");
+    let (status_not_matching, _, _) = request("GET /",
+                                              "content-type: text/plain\r\nauthorization: meh\r\n");
     assert_eq!("HTTP/1.1 501 Not Implemented\r\n", status_not_matching);
 }
 
@@ -224,13 +235,25 @@ fn test_match_multiple_header_conditions_not_matching() {
 fn test_mock_with_status() {
     reset();
 
-    mock("GET", "/")
-        .with_status(204)
-        .with_body("")
-        .create();
+    mock("GET", "/").with_status(204).with_body("").create();
 
     let (status_line, _, _) = request("GET /", "");
     assert_eq!("HTTP/1.1 204\r\n", status_line);
+}
+
+#[test]
+fn test_mock_match_count() {
+    reset();
+
+    mock("GET", "/").with_status(200).with_body("").create();
+
+    let (_, headers_1, _) = request("GET /", "");
+    let ref count_header_1 = headers_1[1];
+    assert_eq!("x-mockito-matches: 1", count_header_1);
+
+    let (_, headers_2, _) = request("GET /", "");
+    let ref count_header_2 = headers_2[1];
+    assert_eq!("x-mockito-matches: 2", count_header_2);
 }
 
 #[test]
@@ -279,7 +302,8 @@ fn test_mock_preserves_header_order() {
     mock.create();
 
     let (_, headers, _) = request("GET /", "");
-    let custom_headers: Vec<_> = headers.into_iter()
+    let custom_headers: Vec<_> = headers
+        .into_iter()
         .filter(|header| header.starts_with("x-custom-header"))
         .collect();
 
@@ -335,10 +359,10 @@ fn test_mock_remove_doesnt_clear_other_mocks() {
 fn test_mock_create_for_is_only_available_during_the_closure_lifetime() {
     reset();
 
-    mock("GET", "/").create_for( || {
-        let (working_status_line, _, _) = request("GET /", "");
-        assert_eq!("HTTP/1.1 200\r\n", working_status_line);
-    });
+    mock("GET", "/").create_for(|| {
+                                    let (working_status_line, _, _) = request("GET /", "");
+                                    assert_eq!("HTTP/1.1 200\r\n", working_status_line);
+                                });
 
     let (reset_status_line, _, _) = request("GET /", "");
     assert_eq!("HTTP/1.1 501 Not Implemented\r\n", reset_status_line);

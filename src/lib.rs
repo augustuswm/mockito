@@ -174,7 +174,8 @@
 extern crate curl;
 extern crate http_muncher;
 extern crate serde;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
 extern crate rand;
 extern crate regex;
@@ -183,6 +184,7 @@ mod server;
 mod request;
 type Request = request::Request;
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -271,7 +273,9 @@ impl<'de> Deserialize<'de> for MRegex {
         where D: Deserializer<'de>
     {
         let value = String::deserialize(deserializer)?;
-        regex::Regex::new(&value).map(|re| MRegex(re)).map_err(serde::de::Error::custom)
+        regex::Regex::new(&value)
+            .map(|re| MRegex(re))
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -309,10 +313,10 @@ impl<'a> From<&'a str> for Matcher {
 impl PartialEq<String> for Matcher {
     fn eq(&self, other: &String) -> bool {
         match self {
-            &Matcher::Exact(ref value) => { value == other },
+            &Matcher::Exact(ref value) => value == other,
             &Matcher::Any => true,
             &Matcher::Missing => false,
-            &Matcher::Regex(ref re) => { re.is_match(other) },
+            &Matcher::Regex(ref re) => re.is_match(other),
         }
     }
 }
@@ -327,6 +331,7 @@ pub struct Mock {
     path: Matcher,
     headers: HashMap<String, Matcher>,
     response: MockResponse,
+    match_count: RefCell<u8>,
 }
 
 impl Mock {
@@ -337,6 +342,7 @@ impl Mock {
             path: path.into(),
             headers: HashMap::new(),
             response: MockResponse::new(),
+            match_count: RefCell::new(0),
         }
     }
 
@@ -366,7 +372,8 @@ impl Mock {
     /// ```
     ///
     pub fn match_header<M: Into<Matcher>>(&mut self, field: &str, value: M) -> &mut Self {
-        self.headers.insert(field.to_owned().to_lowercase(), value.into());
+        self.headers
+            .insert(field.to_owned().to_lowercase(), value.into());
 
         self
     }
@@ -400,7 +407,9 @@ impl Mock {
     /// ```
     ///
     pub fn with_header(&mut self, field: &str, value: &str) -> &mut Self {
-        self.response.headers.push((field.to_owned(), value.to_owned()));
+        self.response
+            .headers
+            .push((field.to_owned(), value.to_owned()));
 
         self
     }
@@ -529,9 +538,15 @@ impl Mock {
 
     #[allow(missing_docs)]
     pub fn matches(&self, request: &Request) -> bool {
-        self.method_matches(request)
-            && self.path_matches(request)
-            && self.headers_match(request)
+        let result = self.method_matches(request) && self.path_matches(request) &&
+                     self.headers_match(request);
+
+        if result {
+            let mut count = self.match_count.borrow_mut();
+            *count = *count + 1;
+        };
+
+        result
     }
 
     fn method_matches(&self, request: &Request) -> bool {
@@ -546,15 +561,19 @@ impl Mock {
         for (field, value) in self.headers.iter() {
             match request.headers.get(field) {
                 Some(request_header_value) => {
-                    if value == request_header_value { continue }
+                    if value == request_header_value {
+                        continue;
+                    }
 
-                    return false
-                },
+                    return false;
+                }
                 None => {
-                    if value == &Matcher::Missing { continue }
+                    if value == &Matcher::Missing {
+                        continue;
+                    }
 
-                    return false
-                },
+                    return false;
+                }
             }
         }
 

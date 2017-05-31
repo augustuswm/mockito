@@ -5,14 +5,16 @@ use serde_json;
 use {Mock, SERVER_ADDRESS, Request};
 
 pub fn try_start() {
-    if is_listening() { return }
+    if is_listening() {
+        return;
+    }
 
     start()
 }
 
 fn start() {
     thread::spawn(move || {
-        let mut mocks: Vec<Mock> = vec!();
+        let mut mocks: Vec<Mock> = vec![];
         let listener = TcpListener::bind(SERVER_ADDRESS).unwrap();
         for stream in listener.incoming() {
             match stream {
@@ -21,10 +23,12 @@ fn start() {
                     if request.is_ok() {
                         handle_request(&mut mocks, request, stream);
                     } else {
-                        stream.write("HTTP/1.1 422 Unprocessable Entity\r\n\r\n".as_bytes()).unwrap();
+                        stream
+                            .write("HTTP/1.1 422 Unprocessable Entity\r\n\r\n".as_bytes())
+                            .unwrap();
                     }
-                },
-                Err(_) => {},
+                }
+                Err(_) => {}
             }
         }
     });
@@ -49,26 +53,35 @@ fn handle_create_mock(mut mocks: &mut Vec<Mock>, request: Request, mut stream: T
         Ok(mock) => {
             mocks.push(mock);
             stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
-        },
+        }
         Err(err) => {
             let message = err.to_string();
-            let response = format!("HTTP/1.1 422 Unprocessable Entity\r\ncontent-length: {}\r\n\r\n{}", message.len(), message);
+            let response = format!("HTTP/1.1 422 Unprocessable Entity\r\ncontent-length: {}\r\n\r\n{}",
+                                   message.len(),
+                                   message);
             stream.write(response.as_bytes()).unwrap();
         }
     }
 }
 
 fn handle_delete_mock(mut mocks: &mut Vec<Mock>, request: Request, mut stream: TcpStream) {
-    match request.headers.iter().find(|&(ref field, _)| { field.to_lowercase() == "x-mock-id" }) {
+    match request
+              .headers
+              .iter()
+              .find(|&(ref field, _)| field.to_lowercase() == "x-mock-id") {
         // Remove the element with x-mock-id
         Some((_, value)) => {
             match mocks.iter().position(|mock| &mock.id == value) {
-                Some(pos) => { mocks.remove(pos); },
-                None => {},
+                Some(pos) => {
+                    mocks.remove(pos);
+                }
+                None => {}
             };
-        },
+        }
         // Remove all elements
-        None => { mocks.clear(); }
+        None => {
+            mocks.clear();
+        }
     }
 
     stream.write("HTTP/1.1 200 OK\r\n\r\n".as_bytes()).unwrap();
@@ -85,13 +98,23 @@ fn handle_match_mock(mocks: &mut Vec<Mock>, request: Request, mut stream: TcpStr
                 headers.push_str("\r\n");
             }
 
+            headers.push_str("x-mockito-matches: ");
+            headers.push_str((*mock.match_count.borrow()).to_string().as_str());
+            headers.push_str("\r\n");
+
             let ref body = mock.response.body;
 
-            let response = format!("HTTP/1.1 {}\r\ncontent-length: {}\r\n{}\r\n{}", mock.response.status, body.len(), headers, body);
+            let response = format!("HTTP/1.1 {}\r\ncontent-length: {}\r\n{}\r\n{}",
+                                   mock.response.status,
+                                   body.len(),
+                                   headers,
+                                   body);
             stream.write(response.as_bytes()).unwrap();
-        },
+        }
         None => {
-            stream.write("HTTP/1.1 501 Not Implemented\r\n\r\n".as_bytes()).unwrap();
+            stream
+                .write("HTTP/1.1 501 Not Implemented\r\n\r\n".as_bytes())
+                .unwrap();
         }
     }
 }

@@ -37,7 +37,8 @@ impl Request {
         if self.last_header_field.is_some() && self.last_header_value.is_some() {
             let last_header_field = mem::replace(&mut self.last_header_field, None).unwrap();
             let last_header_value = mem::replace(&mut self.last_header_value, None).unwrap();
-            self.headers.insert(last_header_field.to_lowercase(), last_header_value);
+            self.headers
+                .insert(last_header_field.to_lowercase(), last_header_value);
         }
     }
 }
@@ -64,15 +65,22 @@ impl<'a> From<&'a mut TcpStream> for Request {
         let mut parser = Parser::request();
 
         loop {
-            if request.is_parsed() { break; }
+            if request.is_parsed() {
+                break;
+            }
 
             let mut buffer = [0; 1024];
             let read_length = stream.read(&mut buffer).unwrap_or(0);
 
-            if read_length == 0 { break; }
+            if read_length == 0 {
+                break;
+            }
 
-            let parse_length = parser.parse(&mut request, (&buffer).chunks(read_length).nth(0).unwrap());
-            if parse_length == 0 || parser.has_error() { break; }
+            let parse_length =
+                parser.parse(&mut request, (&buffer).chunks(read_length).nth(0).unwrap());
+            if parse_length == 0 || parser.has_error() {
+                break;
+            }
         }
 
         if parser.has_error() {
